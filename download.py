@@ -1,4 +1,5 @@
 import urllib2
+import urlparse
 import re
 
 
@@ -25,37 +26,38 @@ def craw_sitemap(url):
         print link
 
 
-# craw_sitemap('http://example.webscraping.com/sitemap.xml')
-
-
 def link_crawler(seed_url, link_regex):
-    """Crawl from the given seed URL following links matched by link_regex
-    """
+    """Crawl from the given seed URL following links matched by link_regex"""
     queue = [seed_url]
+    seen = set(seed_url)
     while queue:
         url = queue.pop()
         html = download(url)
         for link in get_links(html):
             if re.match(link_regex, link):
-                queue.append(link)
+                link = urlparse.urljoin(seed_url, link)
+                if is_valid_link(link) and link not in seen:
+                    seen.add(link)
+                    queue.append(link)
+    return seen
 
 
-# extract all links from the web page
 def get_links(html):
-    pattern = '''<a[^>]+href=['"](?!javascript)(.*?)['"]'''
+    """Extract all links from the web page"""
+    # pattern = '''<a[^>]+href=['"](?!javascript)(.*?)['"]'''
+    pattern = '''<a[^>]+href=['"](.*?)['"]'''
     link_regex = re.compile(pattern, re.IGNORECASE)
     return link_regex.findall(html)
 
 
+def is_valid_link(link):
+    return not link.startswith('javascript:')
+
+
 def test():
     import pprint
-    html = download('http://www.baidu.com/')
-    links = [link for link in get_links(html) if is_valid_link(link)]
+    links = link_crawler('http://www.linuxfromscratch.org/', '/lfs/?')
     pprint.pprint(links)
-
-
-def is_valid_link(link):
-    return not re.match('^javascript:', link, re.IGNORECASE)
 
 
 if __name__ == '__main__':

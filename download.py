@@ -33,12 +33,13 @@ def link_crawler(seed_url, link_regex):
     while queue:
         url = queue.pop()
         html = download(url)
-        for link in get_links(html):
-            if re.match(link_regex, link):
-                link = urlparse.urljoin(seed_url, link)
-                if is_valid_link(link) and link not in seen:
-                    seen.add(link)
-                    queue.append(link)
+        if html:
+            for link in get_links(html):
+                if re.match(link_regex, link):
+                    link = urlparse.urljoin(seed_url, link)
+                    if is_valid_link(link) and link not in seen:
+                        seen.add(link)
+                        queue.append(link)
     return seen
 
 

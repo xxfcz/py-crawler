@@ -2,8 +2,31 @@ import urllib2
 import urlparse
 import re
 import robotparser
+import datetime
+import time
 
-user_agent='wswp'
+user_agent = 'wswp'
+
+
+class Throttle:
+    """Add a delay between downloads to the same domain"""
+
+    def __init__(self, delay):
+        self.delay = delay
+        # last accessed timestamp of each domain
+        self.domains = {}
+
+    def wait(self, url):
+        domain = urlparse.urlparse(url).netloc
+        last_accessed = self.domains.get(domain)
+        if last_accessed is not None and self.delay > 0:
+            sleep_secs = self.delay - (datetime.datetime.now() - last_accessed).seconds
+            if sleep_secs > 0:
+                print 'sleeping for %d seconds ...' % (sleep_secs)
+                time.sleep(sleep_secs)
+        # update last accessed time
+        self.domains[domain] = datetime.datetime.now()
+
 
 def download(url, num_retries=2):
     print 'Downloading:', url
@@ -29,8 +52,8 @@ def link_crawler(seed_url, link_regex):
     rp.set_url(robot_file)
     rp.read()
 
-    queue = [seed_url]      # Task queue
-    seen = set(seed_url)    # Visited urls
+    queue = [seed_url]  # download task queue
+    seen = set(seed_url)  # visited urls
     valid_urls = []
     while queue:
         url = queue.pop()
@@ -64,12 +87,19 @@ def is_valid_link(link):
     return not link.startswith('javascript:')
 
 
-def test():
+def test1():
     import pprint
     # links = link_crawler('http://www.linuxfromscratch.org/', '/lfs/?')
     links = link_crawler('http://example.webscraping.com/', '/(index|view)')
     pprint.pprint(links)
 
 
+def test2():
+    th = Throttle(10)
+    th.wait('http://www.163.com')
+    th.wait('http://www.163.com')
+
+
 if __name__ == '__main__':
-    test()
+    test1()
+    # test2()

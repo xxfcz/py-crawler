@@ -4,8 +4,11 @@ import re
 import robotparser
 import datetime
 import time
+import pprint
+
 
 user_agent = 'wswp'
+g_delay = 1  # seconds
 
 
 class Throttle:
@@ -43,7 +46,7 @@ def download(url, num_retries=2):
     return html
 
 
-def link_crawler(seed_url, link_regex):
+def link_crawler(seed_url, link_regex, max_depth=2):
     """Crawl from the given seed URL following links matched by link_regex"""
     # Parse robots.txt
     parts = urlparse.urlsplit(seed_url)
@@ -52,14 +55,19 @@ def link_crawler(seed_url, link_regex):
     rp.set_url(robot_file)
     rp.read()
 
+    throttle = Throttle(g_delay)
     queue = [seed_url]  # download task queue
-    seen = set(seed_url)  # visited urls
+    seen = {seed_url: 0}  # visited urls and their depths
     valid_urls = []
     while queue:
         url = queue.pop()
         if not rp.can_fetch(user_agent, url):
-            print 'forbidden:', url
+            print 'Blocked by robots.txt:', url
             continue
+        depth = seen[url]
+        if depth == max_depth:
+            continue
+        throttle.wait(url)
         html = download(url)
         if not html:
             continue
@@ -67,11 +75,12 @@ def link_crawler(seed_url, link_regex):
         for link in get_links(html):
             if not re.match(link_regex, link):
                 continue
-            if link not in seen:
-                seen.add(link)
-                link = urlparse.urljoin(seed_url, link)
-                if is_valid_link(link):
-                    queue.append(link)
+            link = urlparse.urljoin(seed_url, link)
+            if is_valid_link(link) and link not in seen:
+                seen[link] = depth + 1
+                queue.append(link)
+    print 'Seen:'
+    pprint.pprint(seen)
     return valid_urls
 
 
@@ -88,16 +97,16 @@ def is_valid_link(link):
 
 
 def test1():
-    import pprint
-    # links = link_crawler('http://www.linuxfromscratch.org/', '/lfs/?')
-    links = link_crawler('http://example.webscraping.com/', '/(index|view)')
+    links = link_crawler('http://www.linuxfromscratch.org/', '/lfs/?', 2)
+    # links = link_crawler('http://example.webscraping.com/', '/(index|view)')
+    print 'Valid links:'
     pprint.pprint(links)
 
 
-def test2():
-    th = Throttle(10)
-    th.wait('http://www.163.com')
-    th.wait('http://www.163.com')
+# def test2():
+#     th = Throttle(10)
+#     th.wait('http://www.163.com')
+#     th.wait('http://www.163.com')
 
 
 if __name__ == '__main__':

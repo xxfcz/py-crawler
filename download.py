@@ -30,17 +30,22 @@ def link_crawler(seed_url, link_regex):
     """Crawl from the given seed URL following links matched by link_regex"""
     queue = [seed_url]
     seen = set(seed_url)
+    valid_urls = []
     while queue:
         url = queue.pop()
         html = download(url)
-        if html:
-            for link in get_links(html):
-                if re.match(link_regex, link):
-                    link = urlparse.urljoin(seed_url, link)
-                    if is_valid_link(link) and link not in seen:
-                        seen.add(link)
-                        queue.append(link)
-    return seen
+        if not html:
+            continue
+        valid_urls.append(url)
+        for link in get_links(html):
+            if not re.match(link_regex, link):
+                continue
+            if link not in seen:
+                seen.add(link)
+                link = urlparse.urljoin(seed_url, link)
+                if is_valid_link(link):
+                    queue.append(link)
+    return valid_urls
 
 
 def get_links(html):

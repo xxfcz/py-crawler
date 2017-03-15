@@ -1,9 +1,11 @@
 import urllib2
 import urlparse
 import re
+import robotparser
 
+user_agent='wswp'
 
-def download(url, user_agent='wswp', num_retries=2):
+def download(url, num_retries=2):
     print 'Downloading:', url
     try:
         headers = {'User-agent': user_agent}
@@ -18,21 +20,23 @@ def download(url, user_agent='wswp', num_retries=2):
     return html
 
 
-def craw_sitemap(url):
-    sitemap = download(url)
-    links = re.findall('<loc>(.*?)</loc>', sitemap)
-    for link in links:
-        # html = download(link)
-        print link
-
-
 def link_crawler(seed_url, link_regex):
     """Crawl from the given seed URL following links matched by link_regex"""
-    queue = [seed_url]
-    seen = set(seed_url)
+    # Parse robots.txt
+    parts = urlparse.urlsplit(seed_url)
+    robot_file = parts.scheme + '://' + parts.netloc + '/robots.txt'
+    rp = robotparser.RobotFileParser()
+    rp.set_url(robot_file)
+    rp.read()
+
+    queue = [seed_url]      # Task queue
+    seen = set(seed_url)    # Visited urls
     valid_urls = []
     while queue:
         url = queue.pop()
+        if not rp.can_fetch(user_agent, url):
+            print 'forbidden:', url
+            continue
         html = download(url)
         if not html:
             continue
@@ -62,7 +66,8 @@ def is_valid_link(link):
 
 def test():
     import pprint
-    links = link_crawler('http://www.linuxfromscratch.org/', '/lfs/?')
+    # links = link_crawler('http://www.linuxfromscratch.org/', '/lfs/?')
+    links = link_crawler('http://example.webscraping.com/', '/(index|view)')
     pprint.pprint(links)
 
 

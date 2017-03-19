@@ -6,9 +6,6 @@ import datetime
 import time
 import pprint
 
-user_agent = 'wswp'
-g_delay = 1  # seconds
-
 
 class Throttle:
     """Add a delay between downloads to the same domain"""
@@ -33,7 +30,7 @@ class Throttle:
 def download(url, num_retries=2):
     print 'Downloading:', url
     try:
-        headers = {'User-agent': user_agent}
+        headers = {'User-agent': 'wswp'}
         request = urllib2.Request(url, headers=headers)
         html = urllib2.urlopen(request).read()
     except urllib2.URLError as e:
@@ -45,7 +42,7 @@ def download(url, num_retries=2):
     return html
 
 
-def link_crawler(seed_url, link_regex, max_depth=2):
+def link_crawler(seed_url, link_regex, max_depth=2, delay=1, user_agent='wswp', num_retries=1, cache=None):
     """Crawl from the given seed URL following links matched by link_regex"""
     # Parse robots.txt
     parts = urlparse.urlsplit(seed_url)
@@ -54,7 +51,7 @@ def link_crawler(seed_url, link_regex, max_depth=2):
     rp.set_url(robot_file)
     rp.read()
 
-    throttle = Throttle(g_delay)
+    d = Downloader(delay, user_agent, num_retries, cache)
     queue = [seed_url]  # download task queue
     seen = {seed_url: 0}  # visited urls and their depths
     valid_urls = []
@@ -66,8 +63,7 @@ def link_crawler(seed_url, link_regex, max_depth=2):
         depth = seen[url]
         if depth == max_depth:
             continue
-        throttle.wait(url)
-        html = download(url)
+        html = d(url)
         if not html:
             continue
         valid_urls.append(url)
@@ -78,8 +74,8 @@ def link_crawler(seed_url, link_regex, max_depth=2):
             if is_valid_link(link) and link not in seen:
                 seen[link] = depth + 1
                 queue.append(link)
-    print 'Seen:'
-    pprint.pprint(seen)
+    # print 'Seen:'
+    # pprint.pprint(seen)
     return valid_urls
 
 
@@ -122,6 +118,7 @@ class Downloader:
             result = self.download(url, headers, self.num_tries)
             if self.cache is not None:
                 self.cache[url] = result
+        return result['html']
 
     def download(self, url, headers, num_retries=2):
         print 'Downloading:', url

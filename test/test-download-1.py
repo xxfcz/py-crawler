@@ -34,5 +34,11 @@ def test_5():
     d('http://www.linuxfromscratch.org/')
 
 
+def test_6():
+    cache = {}
+    links = download.link_crawler('http://www.linuxfromscratch.org/', '/lfs/?', 4, cache=cache)
+    pprint.pprint(links)
+
+
 if __name__ == '__main__':
-    test_5()
+    test_6()

@@ -6,7 +6,6 @@ import datetime
 import time
 import pprint
 
-
 user_agent = 'wswp'
 g_delay = 1  # seconds
 
@@ -96,19 +95,45 @@ def is_valid_link(link):
     return not link.startswith('javascript:')
 
 
-def test1():
-    links = link_crawler('http://www.linuxfromscratch.org/', '/lfs/?', 2)
-    # links = link_crawler('http://example.webscraping.com/', '/(index|view)')
-    print 'Valid links:'
-    pprint.pprint(links)
+class Downloader:
+    def __init__(self, delay=5, user_agent='wswp', num_retries=1, cache=None):
+        self.throttle = Throttle(delay)
+        self.user_agent = user_agent
+        self.num_tries = num_retries
+        self.cache = cache
 
+    def __call__(self, url):
+        result = None
+        if self.cache:
+            try:
+                result = self.cache[url]
+            except KeyError:
+                # url is not available in cache
+                pass
+            else:
+                if self.num_tries > 0 and 500 <= result['code'] < 600:
+                    # ignore cached result and re-download
+                    result = None
+                else:
+                    print 'Hit cache:', url
+        if result is None:
+            self.throttle.wait(url)
+            headers = {'User-agent': self.user_agent}
+            result = self.download(url, headers, self.num_tries)
+            if self.cache is not None:
+                self.cache[url] = result
 
-# def test2():
-#     th = Throttle(10)
-#     th.wait('http://www.163.com')
-#     th.wait('http://www.163.com')
-
-
-if __name__ == '__main__':
-    test1()
-    # test2()
+    def download(self, url, headers, num_retries=2):
+        print 'Downloading:', url
+        code = 200
+        try:
+            request = urllib2.Request(url, headers=headers)
+            html = urllib2.urlopen(request).read()
+        except urllib2.URLError as e:
+            print 'Download error:', e
+            html = None
+            code = e.code
+            if num_retries > 0:
+                if hasattr(e, 'code') and 500 <= e.code < 600:
+                    return self.download(url, headers, num_retries - 1)
+        return {'html': html, 'code': code}

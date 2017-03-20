@@ -34,7 +34,17 @@ def test_5():
     d('http://www.linuxfromscratch.org/')
 
 
+def scrape_ws(url, html):
+    print url
+    print html[0:80]
+
+
 def test_6():
+    links = download.link_crawler('http://example.webscraping.com/', '/(index|view)', callback=scrape_ws)
+    print links
+
+
+def test_7():
     cache = {}
     links = download.link_crawler('http://www.linuxfromscratch.org/', '/lfs/?', 4, cache=cache)
     pprint.pprint(links)

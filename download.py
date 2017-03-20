@@ -42,7 +42,8 @@ def download(url, num_retries=2):
     return html
 
 
-def link_crawler(seed_url, link_regex, max_depth=2, delay=1, user_agent='wswp', num_retries=1, cache=None):
+def link_crawler(seed_url, link_regex, max_depth=2, delay=1, user_agent='wswp', num_retries=1, callback=None,
+                 cache=None):
     """Crawl from the given seed URL following links matched by link_regex"""
     # Parse robots.txt
     parts = urlparse.urlsplit(seed_url)
@@ -67,6 +68,8 @@ def link_crawler(seed_url, link_regex, max_depth=2, delay=1, user_agent='wswp', 
         if not html:
             continue
         valid_urls.append(url)
+        if callback:
+            callback(url, html)
         for link in get_links(html):
             if not re.match(link_regex, link):
                 continue

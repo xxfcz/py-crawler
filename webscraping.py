@@ -1,7 +1,7 @@
-import pprint
 import download
 import re
 import lxml.html
+import mongo_cache
 
 FIELDS = ('area', 'population', 'iso', 'country', 'capital', 'continent', 'tld', 'currency_code', 'currency_name',
           'phone', 'postal_code_format', 'postal_code_regex', 'languages', 'neighbours');
@@ -25,5 +25,5 @@ def cb_print2(url, html):
         print url, row
 
 
-download.link_crawler('http://example.webscraping.com/', '/(index|view)', delay=-1, callback=cb_print2)
-
+cache = mongo_cache.MongoCache()
+download.link_crawler('http://example.webscraping.com/', '/(index|view)', delay=-1, callback=cb_print2, cache=cache)

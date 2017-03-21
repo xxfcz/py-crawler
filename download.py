@@ -42,7 +42,7 @@ def download(url, num_retries=2):
     return html
 
 
-def link_crawler(seed_url, link_regex, max_depth=2, delay=1, user_agent='wswp', num_retries=1, callback=None,
+def link_crawler(seed_url, link_regex=None, max_depth=2, delay=1, user_agent='wswp', num_retries=1, callback=None,
                  cache=None):
     """Crawl from the given seed URL following links matched by link_regex"""
     # Parse robots.txt
@@ -83,10 +83,67 @@ def link_crawler(seed_url, link_regex, max_depth=2, delay=1, user_agent='wswp', 
     return valid_urls
 
 
+class Spider:
+    def __init__(self):
+        self.link_regex = None
+        self.num_retries = 2
+        self.max_depth = 4
+        self.delay = 1
+        self.user_agent = 'wswp'
+        self.callback = None
+        self.cache = None
+
+    def crawl_site(self, seed_url):
+        return self._do_crawl(seed_url)
+        pass
+
+    def crawl_links(self, links):
+        return self._do_crawl(None, links)
+        pass
+
+    def _do_crawl(self, seed_url, links):
+        # Parse robots.txt
+        rp = None
+        if seed_url:
+            parts = urlparse.urlsplit(seed_url)
+            robot_file = parts.scheme + '://' + parts.netloc + '/robots.txt'
+            rp = robotparser.RobotFileParser()
+            rp.set_url(robot_file)
+            rp.read()
+
+        d = Downloader(self.delay, self.user_agent, self.num_retries, self.cache)
+        queue = [seed_url] if seed_url else links[:]  # download task queue
+        seen = {seed_url: 0} if seed_url else {}  # visited urls and their depths
+        valid_urls = []
+        while queue:
+            url = queue.pop()
+            if rp and not rp.can_fetch(self.user_agent, url):
+                print 'Blocked by robots.txt:', url
+                continue
+            depth = seen[url] if url in seen else 0
+            links = []
+            if depth == self.max_depth:
+                continue
+            html = d(url)
+            if not html:
+                continue
+            valid_urls.append(url)
+            if self.callback:
+                links.extend(self.callback(url, html) or [])
+            if self.link_regex:
+                links.extend(link for link in get_links(html) if re.match(self.link_regex, link))
+            for link in links:
+                link = normalize(seed_url, link)
+                if is_valid_link(link) and link not in seen:
+                    seen[link] = depth + 1
+                    queue.append(link)
+        return valid_urls
+
+
 def normalize(seed_url, link):
     """Normalize this URL by removing hash and adding domain
     """
-    link, _ = urlparse.urldefrag(link) # remove hash to avoid duplicates
+    link, _ = urlparse.urldefrag(link)  # remove hash to avoid duplicates
     return urlparse.urljoin(seed_url, link)
 
 
@@ -140,8 +197,11 @@ class Downloader:
         except urllib2.URLError as e:
             print 'Download error:', e
             html = None
-            code = e.code
+            code = 400
+            has_code = hasattr(e, 'code')
             if num_retries > 0:
-                if hasattr(e, 'code') and 500 <= e.code < 600:
-                    return self.download(url, headers, num_retries - 1)
+                if has_code:
+                    code = e.code
+                    if 500 <= e.code < 600:
+                        return self.download(url, headers, num_retries - 1)
         return {'html': html, 'code': code}

@@ -25,6 +25,7 @@ def cb_print2(url, html):
                for field in FIELDS]
         print url, row
 
+
 # Save extracted data to .cvs file
 class ScrapeCallback:
     def __init__(self):

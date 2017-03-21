@@ -62,6 +62,7 @@ def link_crawler(seed_url, link_regex, max_depth=2, delay=1, user_agent='wswp', 
             print 'Blocked by robots.txt:', url
             continue
         depth = seen[url]
+        links = []
         if depth == max_depth:
             continue
         html = d(url)
@@ -69,17 +70,24 @@ def link_crawler(seed_url, link_regex, max_depth=2, delay=1, user_agent='wswp', 
             continue
         valid_urls.append(url)
         if callback:
-            callback(url, html)
-        for link in get_links(html):
-            if not re.match(link_regex, link):
-                continue
-            link = urlparse.urljoin(seed_url, link)
+            links.extend(callback(url, html) or [])
+        if link_regex:
+            links.extend(link for link in get_links(html) if re.match(link_regex, link))
+        for link in links:
+            link = normalize(seed_url, link)
             if is_valid_link(link) and link not in seen:
                 seen[link] = depth + 1
                 queue.append(link)
     # print 'Seen:'
     # pprint.pprint(seen)
     return valid_urls
+
+
+def normalize(seed_url, link):
+    """Normalize this URL by removing hash and adding domain
+    """
+    link, _ = urlparse.urldefrag(link) # remove hash to avoid duplicates
+    return urlparse.urljoin(seed_url, link)
 
 
 def get_links(html):

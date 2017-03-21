@@ -50,5 +50,20 @@ def test_7():
     pprint.pprint(links)
 
 
+URL_IN = 'http://www.1m1m.com'
+URL_OUT = 'http://www.baidu.com'
+
+
+def cb_links(url, html):
+    if url == URL_IN:
+        return [URL_OUT]
+
+
+def test_8():
+    """Test on returning links in callback"""
+    links = download.link_crawler(URL_IN, None, 2)
+    pprint.pprint(links)
+
+
 if __name__ == '__main__':
-    test_6()
+    test_8()

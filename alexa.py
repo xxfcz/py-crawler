@@ -3,7 +3,7 @@ import csv
 import download
 import mongo_cache
 
-MAX_URLS = 15
+MAX_URLS = 20
 
 # top-1m.csv.zip can be downloaded from http://101.110.118.23/s3.amazonaws.com/alexa-static/top-1m.csv.zip
 zf = ZipFile(open('top-1m.csv.zip', 'r'))

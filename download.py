@@ -4,7 +4,7 @@ import re
 import robotparser
 import datetime
 import time
-import pprint
+import threading
 
 
 class Throttle:
@@ -92,14 +92,19 @@ class Spider:
         self.user_agent = 'wswp'
         self.callback = None
         self.cache = None
+        self.max_threads = 8
 
     def crawl_site(self, seed_url):
-        return self._do_crawl(seed_url)
-        pass
+        if self.max_threads > 1:
+            return self._do_crawl_mt(seed_url, None)
+        else:
+            return self._do_crawl(seed_url, None)
 
     def crawl_links(self, links):
-        return self._do_crawl(None, links)
-        pass
+        if self.max_threads > 1:
+            return self._do_crawl_mt(None, links)
+        else:
+            return self._do_crawl(None, links)
 
     def _do_crawl(self, seed_url, links):
         # Parse robots.txt
@@ -137,6 +142,66 @@ class Spider:
                 if is_valid_link(link) and link not in seen:
                     seen[link] = depth + 1
                     queue.append(link)
+        return valid_urls
+
+    def _do_crawl_mt(self, seed_url, urls):
+        # Parse robots.txt
+        rp = None
+        if seed_url:
+            parts = urlparse.urlsplit(seed_url)
+            robot_file = parts.scheme + '://' + parts.netloc + '/robots.txt'
+            rp = robotparser.RobotFileParser()
+            rp.set_url(robot_file)
+            rp.read()
+
+        d = Downloader(self.delay, self.user_agent, self.num_retries, self.cache)
+        queue = [seed_url] if seed_url else urls[:]  # download task queue
+        seen = {seed_url: 0} if seed_url else {}  # visited urls and their depths
+        valid_urls = []
+
+        def process_queue():
+            while True:
+                try:
+                    url = queue.pop()
+                except IndexError:
+                    # queue is empty
+                    break
+                else:
+                    if rp and not rp.can_fetch(self.user_agent, url):
+                        print 'Blocked by robots.txt:', url
+                        continue
+                    depth = seen[url] if url in seen else 0
+                    links = []
+                    if depth == self.max_depth:
+                        continue
+                    html = d(url)
+                    if not html:
+                        continue
+                    valid_urls.append(url)
+                    if self.callback:
+                        links.extend(self.callback(url, html) or [])
+                    if self.link_regex:
+                        links.extend(link for link in get_links(html) if re.match(self.link_regex, link))
+                    for link in links:
+                        link = normalize(seed_url, link)
+                        if is_valid_link(link) and link not in seen:
+                            seen[link] = depth + 1
+                            queue.append(link)
+
+        threads = []
+        while threads or queue:
+            for thread in threads:
+                if not thread.is_alive():
+                    threads.remove(thread)
+            while len(threads) < self.max_threads and queue:
+                thread = threading.Thread(target=process_queue)
+                threads.append(thread)
+                thread.setDaemon(True)
+                thread.start()
+
+        # all threads finished
+        time.sleep(1)
+
         return valid_urls
 
 
